@@ -1,0 +1,174 @@
+// Network Programming
+
+A socket is a way to speak to other programs using standard Unix file descriptors
+Unix programs do IO by reading and writing to file descriptors
+
+A file descriptor is an integer associated with a open file.
+That file can be a pipe, network connection, terminal or real on disk file
+When you want to communicate with another program over the internet you will use a file descriptor
+
+make a call to socket() -> returns a file descriptor
+send and receive or read and write data using send() and recv() sockets calls
+
+socket()
+send()
+recv()
+
+//Two types of Internet sockets
+Stream sockets SOCK_STREAM
+Datagram sockets SOCK_DGRAM -> also called connectionless sockets
+
+
+
+Stream sockets are reliable 2 way connected communication streams
+If you output two items in the socket in the order 1,2 they will arrive in the order 1,2 at the other end
+They will also be error free
+They use the TCP protocol
+they are used for reliable data transmission
+
+Datagram sockets are connectionless and unreliable
+If you send a datagram, it may arrive or arrive out of order
+If it arrives the data within the packet will be error free
+They also use IP for routing but use UDP
+
+They are connectionless because you don't have to maintain an open connection like you do with stream sockets
+You just build a packet and slap an IP header on it and destination information and send it out. No connection needed
+Their applications include video and audio streaming, video conferencing, dhcp client, multiplayer games
+
+For audio, video and games, dropping a few packets doesn't matter most of the time
+The reason for using an unreliable protocol is speed. Its faster to fire and forget than to keep track
+of what has arrived safely and make sure it's in order
+
+// Low level Network Theory
+A packet is basically created and wrapped in a header by the first protocol and then the whole thing (header + packet)
+is also wrapped in another header by the next protocol and again till the final protocol on the physical layer wraps
+it in the final header
+when another computer receives the packet, the hardware strips the Ethernet header, the kernel strips the IP and TCP/UDP headers
+and again till the application finally has the data
+
+//IP Addresses, Structs and Data Munging
+We will talk about how the sockets API stores and manipulates IP addresses and other data
+IPV4 has addresses made of 4 bytes or 32 bits 
+Commonly written in dots or four octets in number form like 192.0.2.111
+We also have a hex representation of IPV6 with each two byte chunk separated by a colon like this:
+2001:0db8:c9d2:aee5:73e3:934a:a5ae:9551
+IPv6 addresses are 128 bits long.
+
+Each block (separated by :) is 16 bits (2 bytes).
+
+Each block is written in 4 hexadecimal digits.
+
+So: 8 blocks × 16 bits = 128 bits.
+If you want to convert it to binary, you can convert each hex digit to 4 bits.
+
+Example:
+
+2001 = 0010 0000 0000 0001
+
+0db8 = 0000 1101 1011 1000
+
+The address ::1 is the loopback address. It means this machine I'm running on now.
+
+For organizational reasons it is sometimes convenient to declare that some of the bytes are are the
+network portion and the remainder is the host portion
+So 192.0.2.12 - network portion is 192.0.2.0 and 12 is the host portion
+So host 12 on the network 192.0.2.0
+
+// revise IPV4, IPV6 and subnetting, netmasking
+
+
+// PORT NUMBER 
+aside the IP address there is another number used by TCP socket streams and UDP sockets
+The port number is a 16bit number that is like a local address for the connection
+It is used to identify the process or service you are communicating with on a PC 
+Different network services have different well known port numbers
+HTTP is port 80, SMTP is port 25
+
+// BYTE ORDER
+we store bytes either in big endian or little endian format
+Big endian is also called network byte order
+Your computer stores bytes in Host byte order which could be big or little endian depending on your system
+Because of this difference when building packets to fill out your data structures you will need to ensure your 2 byte (port number)
+or 4 byte (IP addresses) numbers are in network byte order to make your code portable with all machines
+
+There are 2 types of numbers you can convert- short and long
+The functions responsible for this also work with the unsigned variations
+When sending data or packets to the network:
+to convert short from Host Byte order to Network Byte order -> htons()
+to convert long from Host Byte order to Network Byte order ->htonl()
+When receiving on your host from the network:
+to convert short from Network Byte order to Host Byte order -> ntohs()
+to convert long from Network Byte order to Host Byte order -> ntohl()
+
+
+struct addrinfo {
+int ai_flags; // AI_PASSIVE, AI_CANONNAME, etc.
+int ai_family; // AF_INET, AF_INET6, AF_UNSPEC
+int ai_socktype; // SOCK_STREAM, SOCK_DGRAM
+int ai_protocol; // use 0 for "any"
+size_t ai_addrlen; // size of ai_addr in bytes
+struct sockaddr *ai_addr; // struct sockaddr_in or _in6
+char *ai_canonname; // full canonical hostname
+struct addrinfo *ai_next; // linked list, next node
+};
+
+struct sockaddr {
+unsigned short sa_family; // address family, AF_xxx
+char sa_data[14]; // 14 bytes of protocol address
+};
+
+
+a call to getaddrinfo() will fill out these structs but you have to peer into them to get the values out
+sockaddr holds socket address information for many types of sockets
+
+struct sockaddr_in {
+short int sin_family; // Address family, AF_INET
+unsigned short int sin_port; // Port number
+struct in_addr sin_addr; // Internet address
+unsigned char sin_zero[8]; // Same size as struct sockaddr
+};
+
+struct in_addr {
+uint32_t s_addr; // that's a 32-bit int (4 bytes)
+};
+
+Programmers created this structure to make it easy to work with sockaddr
+
+
+There are a bunch of functions that allow you to manipulate IP addresses
+inet_pton -> converts IP addresses in numbers and dot notation into either a struct in_addr or struct in6_addr
+depending on whether you specify AF_INET or AF_INET6
+
+pton -> printable or presentation to network
+
+struct sockaddr_in sa; // IPv4
+struct sockaddr_in6 sa6; // IPv6
+inet_pton(AF_INET, "192.0.2.1", &(sa.sin_addr)); // IPv4
+inet_pton(AF_INET6, "2001:db8:63b3:1::3490", &(sa6.sin6_addr)); // IPv6
+
+
+add error checking-> returns -1 on error and 0 if IP address is messed up
+always check if it returns a value greater than 0
+
+ntop() -> means network to presentation
+allows you to convert IP addresses from binary representation to string representation
+
+char ip4[INET_ADDRSTRLEN]; // space to hold the IPv4 string
+struct sockaddr_in sa; // pretend this is loaded with something
+inet_ntop(AF_INET, &(sa.sin_addr), ip4, INET_ADDRSTRLEN);
+printf("The IPv4 address is: %s\n", ip4);
+// IPv6:
+char ip6[INET6_ADDRSTRLEN]; // space to hold the IPv6 string
+struct sockaddr_in6 sa6; // pretend this is loaded with something
+inet_ntop(AF_INET6, &(sa6.sin6_addr), ip6, INET6_ADDRSTRLEN);
+printf("The address is: %s\n", ip6);
+
+When you call it you will pass the following:
+- address type (IPV4 or IPV6)
+-the address of struct holding the binary repr of network address
+- pointer to a string to hold the result
+-maximum length of the string
+
+Two macros hold the size of the string you will need to store the largest IPV4 or IPV6 addresses
+- INET_ADDRSTRLEN
+-INET6_ADDRSTRLEN
