@@ -172,3 +172,11 @@ When you call it you will pass the following:
 Two macros hold the size of the string you will need to store the largest IPV4 or IPV6 addresses
 - INET_ADDRSTRLEN
 -INET6_ADDRSTRLEN
+
+
+
+
+# TOPICS TO REVISE
+data representation
+bitwise operations
+revise C pointers, strings, structs
